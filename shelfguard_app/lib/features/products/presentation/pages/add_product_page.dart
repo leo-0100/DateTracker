@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/custom_text_field.dart';
+import '../../../../core/utils/validators.dart';
 
 class AddProductPage extends StatefulWidget {
   final String? productId;
@@ -147,12 +148,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
                 prefixIcon: Icons.shopping_bag_outlined,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter product name';
-                  }
-                  return null;
-                },
+                validator: Validators.validateProductName,
               ),
               const SizedBox(height: 20),
 
@@ -248,34 +244,32 @@ class _AddProductPageState extends State<AddProductPage> {
               // Quantity
               CustomTextField(
                 label: 'Quantity',
-                hint: 'Enter quantity',
+                hint: 'Enter quantity (1-10,000)',
                 controller: _quantityController,
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.numbers,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                 ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter quantity';
-                  }
-                  final quantity = int.tryParse(value);
-                  if (quantity == null || quantity < 1) {
-                    return 'Quantity must be at least 1';
-                  }
-                  return null;
-                },
+                validator: Validators.validateQuantity,
               ),
               const SizedBox(height: 20),
 
               // Barcode (optional)
               CustomTextField(
                 label: 'Barcode (Optional)',
-                hint: 'Scan or enter barcode',
+                hint: 'Scan or enter barcode (8, 12, or 13 digits)',
                 controller: _barcodeController,
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.qr_code,
                 suffixIcon: Icons.qr_code_scanner,
+                validator: (value) {
+                  // Barcode is optional, but if provided must be valid
+                  if (value != null && value.isNotEmpty) {
+                    return Validators.validateBarcode(value);
+                  }
+                  return null;
+                },
                 onSuffixIconTap: () {
                   context.push('/products/scan').then((barcode) {
                     if (barcode != null && barcode is String) {
@@ -289,10 +283,11 @@ class _AddProductPageState extends State<AddProductPage> {
               // Notes (optional)
               CustomTextField(
                 label: 'Notes (Optional)',
-                hint: 'Add any additional notes',
+                hint: 'Add any additional notes (max 500 chars)',
                 controller: _notesController,
                 maxLines: 4,
                 prefixIcon: Icons.note_outlined,
+                validator: Validators.validateNotes,
               ),
               const SizedBox(height: 32),
 

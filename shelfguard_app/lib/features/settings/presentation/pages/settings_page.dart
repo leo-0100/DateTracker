@@ -49,7 +49,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         radius: 32,
                         backgroundColor: theme.colorScheme.primary,
                         child: Text(
-                          state.user.name.substring(0, 1).toUpperCase(),
+                          state.user.name.isNotEmpty
+                              ? state.user.name.substring(0, 1).toUpperCase()
+                              : '?',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: theme.colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,

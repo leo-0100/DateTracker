@@ -19,7 +19,7 @@ class LoginRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [email]; // Don't include password in props for security
 }
 
 class SignupRequested extends AuthEvent {
@@ -34,7 +34,7 @@ class SignupRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [name, email, password];
+  List<Object?> get props => [name, email]; // Don't include password in props for security
 }
 
 class LogoutRequested extends AuthEvent {}

@@ -36,57 +36,70 @@ class _ScanProductPageState extends State<ScanProductPage> with SingleTickerProv
     super.dispose();
   }
 
-  void _simulateScan() {
+  Future<void> _simulateScan() async {
+    if (!mounted) return;
+
     setState(() {
       _isScanning = true;
     });
 
-    // Simulate barcode scanning
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // Simulate barcode scanning
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      setState(() {
+        _isScanning = false;
+      });
+
+      if (!mounted) return;
+
+      final barcode = '${DateTime.now().millisecondsSinceEpoch % 1000000000000}';
+
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              SizedBox(width: 12),
+              Text('Barcode Scanned'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Barcode: $barcode'),
+              const SizedBox(height: 16),
+              const Text('What would you like to do?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.pop(barcode);
+                context.push('/products/add');
+              },
+              child: const Text('Add Product'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print('Scan error: $e');
       if (mounted) {
         setState(() {
           _isScanning = false;
         });
-
-        final barcode = '${DateTime.now().millisecondsSinceEpoch % 1000000000000}';
-
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 12),
-                Text('Barcode Scanned'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Barcode: $barcode'),
-                const SizedBox(height: 16),
-                const Text('What would you like to do?'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.pop(barcode);
-                  context.push('/products/add');
-                },
-                child: const Text('Add Product'),
-              ),
-            ],
-          ),
-        );
       }
-    });
+    }
   }
 
   @override

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
@@ -10,9 +13,30 @@ import '../../features/products/presentation/pages/scan_product_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/login',
-    routes: [
+  static GoRouter createRouter(AuthBloc authBloc) {
+    return GoRouter(
+      initialLocation: '/login',
+      refreshListenable: _AuthStateNotifier(authBloc),
+      redirect: (context, state) {
+        final authState = authBloc.state;
+        final isAuthenticated = authState is Authenticated;
+        final isAuthRoute = state.matchedLocation == '/login' ||
+                           state.matchedLocation == '/signup';
+
+        // If not authenticated and trying to access protected route, redirect to login
+        if (!isAuthenticated && !isAuthRoute) {
+          return '/login';
+        }
+
+        // If authenticated and on auth route, redirect to dashboard
+        if (isAuthenticated && isAuthRoute) {
+          return '/dashboard';
+        }
+
+        // No redirect needed
+        return null;
+      },
+      routes: [
       GoRoute(
         path: '/login',
         name: 'login',
@@ -136,5 +160,16 @@ class AppRouter {
         );
       },
     );
+  }
+}
+
+/// Auth state notifier for GoRouter to listen to authentication changes
+class _AuthStateNotifier extends ChangeNotifier {
+  final AuthBloc _authBloc;
+
+  _AuthStateNotifier(this._authBloc) {
+    _authBloc.stream.listen((_) {
+      notifyListeners();
+    });
   }
 }

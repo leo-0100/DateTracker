@@ -6,6 +6,7 @@ import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/custom_text_field.dart';
+import '../../../../core/utils/validators.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -143,15 +144,7 @@ class _SignupPageState extends State<SignupPage> with SingleTickerProviderStateM
                             controller: _nameController,
                             textCapitalization: TextCapitalization.words,
                             prefixIcon: Icons.person_outlined,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              if (value.length < 2) {
-                                return 'Name must be at least 2 characters';
-                              }
-                              return null;
-                            },
+                            validator: Validators.validateName,
                           ),
                           const SizedBox(height: 20),
 
@@ -162,34 +155,18 @@ class _SignupPageState extends State<SignupPage> with SingleTickerProviderStateM
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             prefixIcon: Icons.email_outlined,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
+                            validator: Validators.validateEmail,
                           ),
                           const SizedBox(height: 20),
 
                           // Password field
                           CustomTextField(
                             label: 'Password',
-                            hint: 'Create a password',
+                            hint: 'Min 12 chars, uppercase, lowercase, number, special char',
                             controller: _passwordController,
                             obscureText: true,
                             prefixIcon: Icons.lock_outlined,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
+                            validator: Validators.validatePassword,
                           ),
                           const SizedBox(height: 20),
 
