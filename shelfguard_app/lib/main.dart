@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/database_service.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 
 void main() async {
@@ -11,6 +12,9 @@ void main() async {
 
   // Initialize encrypted database
   await DatabaseService.initialize();
+
+  // Initialize notifications
+  await NotificationService().initialize();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

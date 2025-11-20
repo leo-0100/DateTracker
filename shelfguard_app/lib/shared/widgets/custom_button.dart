@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 
+enum ButtonVariant {
+  filled,
+  outlined,
+}
+
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
   final bool isLoading;
-  final bool isOutlined;
+  final bool isOutlined; // Deprecated: use variant instead
+  final ButtonVariant variant;
   final IconData? icon;
   final Color? backgroundColor;
   final Color? textColor;
@@ -17,7 +23,8 @@ class CustomButton extends StatelessWidget {
     required this.text,
     required this.onPressed,
     this.isLoading = false,
-    this.isOutlined = false,
+    @Deprecated('Use variant parameter instead') this.isOutlined = false,
+    this.variant = ButtonVariant.filled,
     this.icon,
     this.backgroundColor,
     this.textColor,
@@ -30,7 +37,10 @@ class CustomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (isOutlined) {
+    // Support both old isOutlined and new variant parameter
+    final shouldBeOutlined = variant == ButtonVariant.outlined || isOutlined;
+
+    if (shouldBeOutlined) {
       return SizedBox(
         width: width,
         height: height,
@@ -77,7 +87,7 @@ class CustomButton extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: 2.5,
           valueColor: AlwaysStoppedAnimation<Color>(
-            isOutlined
+            (variant == ButtonVariant.outlined || isOutlined)
                 ? (textColor ?? theme.colorScheme.primary)
                 : (textColor ?? theme.colorScheme.onPrimary),
           ),

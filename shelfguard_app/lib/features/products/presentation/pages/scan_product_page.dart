@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../shared/widgets/custom_button.dart';
+import '../../../../core/utils/validators.dart';
 
 class ScanProductPage extends StatefulWidget {
   const ScanProductPage({super.key});
@@ -9,97 +11,146 @@ class ScanProductPage extends StatefulWidget {
   State<ScanProductPage> createState() => _ScanProductPageState();
 }
 
-class _ScanProductPageState extends State<ScanProductPage> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scanLineAnimation;
-  bool _isScanning = false;
+class _ScanProductPageState extends State<ScanProductPage> {
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
+
+  bool _isProcessing = false;
+  String? _lastScannedCode;
 
   @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
 
-    _scanLineAnimation = Tween<double>(begin: 0.2, end: 0.8).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (_isProcessing) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+
+    final barcode = barcodes.first.rawValue;
+    if (barcode == null || barcode.isEmpty) return;
+
+    // Prevent duplicate scans
+    if (_lastScannedCode == barcode) return;
+    _lastScannedCode = barcode;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    // Vibrate on successful scan
+    await _scannerController.stop();
+
+    if (!mounted) return;
+
+    await _showBarcodeDetectedDialog(barcode);
+
+    setState(() {
+      _isProcessing = false;
+    });
+  }
+
+  Future<void> _showBarcodeDetectedDialog(String barcode) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 12),
+            Text('Barcode Scanned'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Barcode: $barcode',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('What would you like to do?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _scannerController.start();
+              setState(() {
+                _lastScannedCode = null;
+              });
+            },
+            child: const Text('Scan Another'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              context.pop(barcode);
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Add Product'),
+          ),
+        ],
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  void _showManualEntryDialog() {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Barcode Manually'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Barcode',
+              hintText: 'Enter 8, 12, or 13 digit barcode',
+              prefixIcon: Icon(Icons.qr_code),
+            ),
+            validator: Validators.validateBarcode,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context);
+                context.pop(controller.text);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
   }
 
-  Future<void> _simulateScan() async {
-    if (!mounted) return;
-
-    setState(() {
-      _isScanning = true;
-    });
-
-    try {
-      // Simulate barcode scanning
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) return;
-
-      setState(() {
-        _isScanning = false;
-      });
-
-      if (!mounted) return;
-
-      final barcode = '${DateTime.now().millisecondsSinceEpoch % 1000000000000}';
-
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 12),
-              Text('Barcode Scanned'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Barcode: $barcode'),
-              const SizedBox(height: 16),
-              const Text('What would you like to do?'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-                context.pop(barcode);
-                context.push('/products/add');
-              },
-              child: const Text('Add Product'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      print('Scan error: $e');
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-        });
-      }
-    }
+  void _toggleTorch() {
+    _scannerController.toggleTorch();
+    setState(() {});
   }
 
   @override
@@ -112,177 +163,119 @@ class _ScanProductPageState extends State<ScanProductPage> with SingleTickerProv
         title: const Text('Scan Barcode'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Flash toggled')),
-              );
-            },
+            icon: ValueListenableBuilder(
+              valueListenable: _scannerController.torchState,
+              builder: (context, state, child) {
+                return Icon(
+                  state == TorchState.on ? Icons.flash_on : Icons.flash_off,
+                );
+              },
+            ),
+            onPressed: _toggleTorch,
+            tooltip: 'Toggle Flash',
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Camera preview placeholder
-          Container(
-            color: Colors.black,
-            child: Center(
-              child: Icon(
-                Icons.camera_alt,
-                size: 100,
-                color: Colors.white.withOpacity(0.3),
-              ),
-            ),
+          // Camera preview
+          MobileScanner(
+            controller: _scannerController,
+            onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Camera Error',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        error.errorDetails?.message ?? 'Failed to access camera',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 24),
+                      CustomButton(
+                        text: 'Enter Barcode Manually',
+                        onPressed: _showManualEntryDialog,
+                        icon: Icons.keyboard,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
 
           // Scanning overlay
           CustomPaint(
+            size: size,
             painter: ScannerOverlayPainter(),
-            child: Container(),
           ),
 
-          // Animated scan line
-          if (_isScanning)
-            AnimatedBuilder(
-              animation: _scanLineAnimation,
-              builder: (context, child) {
-                return Positioned(
-                  left: size.width * 0.1,
-                  right: size.width * 0.1,
-                  top: size.height * _scanLineAnimation.value,
-                  child: Container(
-                    height: 2,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          theme.colorScheme.primary,
-                          Colors.transparent,
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.primary,
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-
-          // Instructions
+          // Instructions at top
           Positioned(
+            top: 40,
             left: 0,
             right: 0,
-            top: size.height * 0.1,
             child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.symmetric(horizontal: 32),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                _isScanning
-                    ? 'Scanning...'
-                    : 'Position the barcode within the frame',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: const Text(
+                'Position the barcode within the frame',
                 textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-
-          // Bottom controls
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.8),
-                  ],
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Scan button
-                  CustomButton(
-                    text: _isScanning ? 'Scanning...' : 'Scan Barcode',
-                    onPressed: _isScanning ? () {} : _simulateScan,
-                    isLoading: _isScanning,
-                    icon: Icons.qr_code_scanner,
-                    backgroundColor: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Manual entry button
-                  CustomButton(
-                    text: 'Enter Manually',
-                    onPressed: () {
-                      _showManualEntryDialog();
-                    },
-                    isOutlined: true,
-                    textColor: Colors.white,
-                  ),
-                ],
-              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  void _showManualEntryDialog() {
-    final controller = TextEditingController();
+          // Manual entry button at bottom
+          Positioned(
+            bottom: 40,
+            left: 24,
+            right: 24,
+            child: CustomButton(
+              text: 'Enter Manually',
+              onPressed: _showManualEntryDialog,
+              icon: Icons.keyboard,
+              variant: ButtonVariant.outlined,
+            ),
+          ),
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter Barcode'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: 'Enter barcode number',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                Navigator.pop(context);
-                context.pop(controller.text);
-                context.push('/products/add');
-              }
-            },
-            child: const Text('Continue'),
-          ),
+          // Processing indicator
+          if (_isProcessing)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
+/// Custom painter for scanner overlay
 class ScannerOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -290,78 +283,76 @@ class ScannerOverlayPainter extends CustomPainter {
       ..color = Colors.black.withOpacity(0.5)
       ..style = PaintingStyle.fill;
 
-    final scanAreaSize = size.width * 0.8;
-    final scanAreaLeft = (size.width - scanAreaSize) / 2;
-    final scanAreaTop = size.height * 0.3;
+    final scanAreaSize = size.width * 0.7;
+    final scanAreaRect = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: scanAreaSize,
+      height: scanAreaSize * 0.6,
+    );
 
-    // Draw overlay with cutout
+    // Draw overlay with transparent center
     final path = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(scanAreaLeft, scanAreaTop, scanAreaSize, scanAreaSize * 0.6),
-          const Radius.circular(12),
-        ),
-      )
+      ..addRRect(RRect.fromRectAndRadius(scanAreaRect, const Radius.circular(12)))
       ..fillType = PathFillType.evenOdd;
 
     canvas.drawPath(path, paint);
 
     // Draw corner brackets
-    final bracketPaint = Paint()
-      ..color = Colors.white
+    final cornerPaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 4
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+      ..strokeCap = StrokeCap.round;
 
-    final bracketLength = 30.0;
+    const cornerLength = 30.0;
 
     // Top-left corner
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + bracketLength),
-      Offset(scanAreaLeft, scanAreaTop),
-      bracketPaint,
+      scanAreaRect.topLeft,
+      scanAreaRect.topLeft + const Offset(cornerLength, 0),
+      cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop),
-      Offset(scanAreaLeft + bracketLength, scanAreaTop),
-      bracketPaint,
+      scanAreaRect.topLeft,
+      scanAreaRect.topLeft + const Offset(0, cornerLength),
+      cornerPaint,
     );
 
     // Top-right corner
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize - bracketLength, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      bracketPaint,
+      scanAreaRect.topRight,
+      scanAreaRect.topRight + const Offset(-cornerLength, 0),
+      cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + bracketLength),
-      bracketPaint,
+      scanAreaRect.topRight,
+      scanAreaRect.topRight + const Offset(0, cornerLength),
+      cornerPaint,
     );
 
     // Bottom-left corner
-    final scanAreaBottom = scanAreaTop + (scanAreaSize * 0.6);
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaBottom - bracketLength),
-      Offset(scanAreaLeft, scanAreaBottom),
-      bracketPaint,
+      scanAreaRect.bottomLeft,
+      scanAreaRect.bottomLeft + const Offset(cornerLength, 0),
+      cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaBottom),
-      Offset(scanAreaLeft + bracketLength, scanAreaBottom),
-      bracketPaint,
+      scanAreaRect.bottomLeft,
+      scanAreaRect.bottomLeft + const Offset(0, -cornerLength),
+      cornerPaint,
     );
 
     // Bottom-right corner
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize - bracketLength, scanAreaBottom),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaBottom),
-      bracketPaint,
+      scanAreaRect.bottomRight,
+      scanAreaRect.bottomRight + const Offset(-cornerLength, 0),
+      cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaBottom - bracketLength),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaBottom),
-      bracketPaint,
+      scanAreaRect.bottomRight,
+      scanAreaRect.bottomRight + const Offset(0, -cornerLength),
+      cornerPaint,
     );
   }
 
