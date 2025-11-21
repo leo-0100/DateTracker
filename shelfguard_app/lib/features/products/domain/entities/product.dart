@@ -8,6 +8,7 @@ class Product extends Equatable {
   final int quantity;
   final String? barcode;
   final String? notes;
+  final String? storageLocation;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -19,6 +20,7 @@ class Product extends Equatable {
     this.quantity = 1,
     this.barcode,
     this.notes,
+    this.storageLocation,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -48,6 +50,7 @@ class Product extends Equatable {
         quantity,
         barcode,
         notes,
+        storageLocation,
         createdAt,
         updatedAt,
       ];
@@ -60,6 +63,7 @@ class Product extends Equatable {
     int? quantity,
     String? barcode,
     String? notes,
+    String? storageLocation,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -71,6 +75,7 @@ class Product extends Equatable {
       quantity: quantity ?? this.quantity,
       barcode: barcode ?? this.barcode,
       notes: notes ?? this.notes,
+      storageLocation: storageLocation ?? this.storageLocation,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
